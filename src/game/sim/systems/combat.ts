@@ -1,6 +1,7 @@
 import { circlesOverlap } from '../collision'
 import type { WeaponConfig } from '../config'
 import type { EnemyState, InputState, Island, Projectile, World } from '../types'
+import { removeDead } from './shared'
 
 export function stepCombat(world: World, input: InputState, dt: number): void {
   tickCooldowns(world, dt)
@@ -18,7 +19,7 @@ function tickCooldowns(world: World, dt: number): void {
   cd.right = Math.max(0, cd.right - dt)
 }
 
-function spawnProjectile(
+export function spawnProjectile(
   world: World,
   owner: Projectile['owner'],
   x: number,
@@ -143,11 +144,3 @@ function hitEnemy(world: World, enemy: EnemyState, p: Projectile): void {
   }
 }
 
-/** In-place compaction: no new array per step. */
-function removeDead<T extends { dead: boolean }>(items: T[]): void {
-  let kept = 0
-  for (const item of items) {
-    if (!item.dead) items[kept++] = item
-  }
-  items.length = kept
-}

@@ -57,6 +57,24 @@ button:focus-visible {
   display: none;
 }
 
+.game-shell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.debug-hud {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  margin: 0;
+  padding: 6px 10px;
+  font: 12px/1.4 monospace;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
 @media (orientation: portrait) and (max-width: 900px) {
   .rotate-notice {
     display: grid;

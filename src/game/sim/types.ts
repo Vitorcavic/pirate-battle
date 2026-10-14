@@ -1,4 +1,5 @@
 import type { GameConfig, IslandConfig } from './config'
+import type { Rng } from './random'
 
 export interface InputState {
   forward: boolean
@@ -31,6 +32,7 @@ export interface EnemyState extends ShipState {
   id: number
   kind: EnemyKind
   variant: number // cosmetic: which chaser skin
+  cooldown: number // seconds until next attack
   dead: boolean
 }
 
@@ -53,19 +55,29 @@ export interface Cooldowns {
   right: number
 }
 
+export type MatchStatus = 'playing' | 'ended'
+export type EndReason = 'time' | 'death'
+
 /** Facts the renderer/audio react to. The simulation only appends; the controller clears. */
 export type SimEvent =
   | { type: 'shot'; x: number; y: number }
   | { type: 'hit'; x: number; y: number; target: 'player' | 'enemy' | 'obstacle' }
   | { type: 'enemyDestroyed'; x: number; y: number }
+  | { type: 'matchEnded'; reason: EndReason}
 
 export type Island = IslandConfig
 
 export interface World {
   config: GameConfig // per-match snapshot, never mutated
+  seed: number
+  rng: Rng
+  status: MatchStatus
+  endReason: EndReason | null
   time: number // active simulated seconds
   score: number
   nextId: number
+  spawnTimer: number
+  spawnCount: number
   player: ShipState
   cooldowns: Cooldowns
   enemies: EnemyState[]

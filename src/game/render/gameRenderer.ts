@@ -11,7 +11,7 @@ import {
 import { buildArena } from './buildArena'
 import { Effects } from './effects'
 import { HealthBar } from './healthBar'
-import type { EnemyState, ShipState, SimEvent, World } from '../sim/types'
+import type { EnemyState, ShipState, World } from '../sim/types'
 
 /** Ship art points down (+y); simulation heading 0 points right (+x). */
 const SPRITE_ROTATION_OFFSET = -Math.PI / 2
@@ -62,7 +62,7 @@ export class GameRenderer {
     this.syncShip(this.playerView, world.player)
     this.syncEnemies(world.enemies)
     this.syncProjectiles(world)
-    this.handleEvents(world.events)
+    this.handleEvents(world)
     this.effects.update(dt)
   }
 
@@ -149,10 +149,10 @@ export class GameRenderer {
     }
   }
 
-  private handleEvents(events: SimEvent[]): void {
+  private handleEvents(world: World): void {
     const small = this.textures.explosion3!
     const big = this.textures.explosion1!
-    for (const ev of events) {
+    for (const ev of world.events) {
       switch (ev.type) {
         case 'shot':
           this.effects.spawn(small, ev.x, ev.y, 0.15, 0.3 * EXPLOSION_SCALE, 0.7 * EXPLOSION_SCALE)
@@ -162,6 +162,13 @@ export class GameRenderer {
           break
         case 'enemyDestroyed':
           this.effects.spawn(big, ev.x, ev.y, 0.5, 0.6 * EXPLOSION_SCALE, 1.4 * EXPLOSION_SCALE)
+          break
+        case 'matchEnded':
+          if (ev.reason === 'death') {
+            this.playerView.sprite.visible = false
+            this.playerView.bar.view.visible = false
+            this.effects.spawn(big, world.player.x, world.player.y, 0.7, 0.8 * EXPLOSION_SCALE, 1.8 * EXPLOSION_SCALE)
+          }
           break
       }
     }
