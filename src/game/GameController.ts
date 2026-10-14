@@ -1,10 +1,11 @@
 import type { Application, Ticker } from 'pixi.js'
 import { KeyboardInput } from './input/keyboardInput'
+import { TouchInput } from './input/touchInput'
 import type { GameTextures } from './render/assets'
 import { GameRenderer } from './render/gameRenderer'
 import type { UserSettings } from './sim/config'
 import { Simulation } from './sim/simulation'
-import type { EndReason, MatchStatus } from './sim/types'
+import type { EndReason, InputState, MatchStatus } from './sim/types'
 
 declare global {
   interface Window {
@@ -17,6 +18,7 @@ declare global {
 export interface MatchSnapshot {
   status: MatchStatus
   endReason: EndReason | null
+  paused: boolean
   elapsed: number
   timeLeft: number
   score: number
@@ -35,40 +37,104 @@ export interface GameHooks {
   onEnd?: (result: MatchResult) => void
 }
 
+export interface GameOptions {
+  hooks?: GameHooks
+  touch?: TouchInput
+  seed?: number
+}
+
 const SNAPSHOT_INTERVAL = 0.1 // seconds
+const PAUSE_KEYS = new Set(['Escape', 'KeyP'])
+/** Same condition as the CSS rotate notice. */
+const PORTRAIT_QUERY = '(orientation: portrait) and (max-width: 900px)'
 
 export class GameController {
   private readonly app: Application
   private readonly sim: Simulation
-  private readonly input = new KeyboardInput()
+  private readonly keyboard = new KeyboardInput()
+  private readonly touch: TouchInput
   private readonly renderer: GameRenderer
   private readonly hooks: GameHooks
+  private readonly portrait = window.matchMedia(PORTRAIT_QUERY)
+  private paused = false
   private sinceSnapshot = SNAPSHOT_INTERVAL
   private endNotified = false
 
-  constructor(app: Application, textures: GameTextures, settings: UserSettings, hooks: GameHooks = {}, seed?: number) {
+  constructor(app: Application, textures: GameTextures, settings: UserSettings, options: GameOptions = {}) {
     this.app = app
-    this.hooks = hooks
-    this.sim = new Simulation(settings, seed)
+    this.hooks = options.hooks ?? {}
+    this.touch = options.touch ?? new TouchInput()
+    this.sim = new Simulation(settings, options.seed)
     this.renderer = new GameRenderer(app.stage, textures, this.sim.world)
   }
 
   start(): void {
-    this.input.attach()
+    this.keyboard.attach()
+    window.addEventListener('keydown', this.onPauseKey)
+    window.addEventListener('blur', this.autoPause)
+    document.addEventListener('visibilitychange', this.onVisibility)
+    this.portrait.addEventListener('change', this.onOrientation)
     this.app.ticker.add(this.tick)
     if (import.meta.env.DEV) window.__sim = this.sim
   }
 
   destroy(): void {
     this.app.ticker.remove(this.tick)
-    this.input.detach()
+    window.removeEventListener('keydown', this.onPauseKey)
+    window.removeEventListener('blur', this.autoPause)
+    document.removeEventListener('visibilitychange', this.onVisibility)
+    this.portrait.removeEventListener('change', this.onOrientation)
+    this.keyboard.detach()
+    this.touch.reset()
     this.renderer.destroy()
     if (import.meta.env.DEV && window.__sim === this.sim) delete window.__sim
   }
 
+  /** Freezes the simulation and releases the keyboard. Safe to call repeatedly. */
+  pause(): void {
+    if (this.paused || this.sim.world.status !== 'playing') return
+    this.paused = true
+    this.keyboard.detach() // also drops held keys: nothing accumulates while paused
+    this.touch.reset()
+    this.emitSnapshot()
+  }
+
+  /** Only called from an explicit player action (the Resume button). */
+  resume(): void {
+    if (!this.paused || this.sim.world.status !== 'playing') return
+    this.paused = false
+    this.sim.resetClock() // no catch-up for the paused period
+    this.keyboard.attach()
+    this.emitSnapshot()
+  }
+
+  private readonly onPauseKey = (e: KeyboardEvent): void => {
+    if (PAUSE_KEYS.has(e.code) && !e.repeat) this.pause()
+  }
+  private readonly autoPause = (): void => this.pause()
+  private readonly onVisibility = (): void => {
+    if (document.hidden) this.pause()
+  }
+  private readonly onOrientation = (e: MediaQueryListEvent): void => {
+    if (e.matches) this.pause()
+  }
+
+  private readInput(): InputState {
+    const k = this.keyboard.read()
+    const t = this.touch.read()
+    return {
+      forward: k.forward || t.forward,
+      turn: Math.sign(k.turn + t.turn) as -1 | 0 | 1,
+      fireFront: k.fireFront || t.fireFront,
+      fireLeft: k.fireLeft || t.fireLeft,
+      fireRight: k.fireRight || t.fireRight,
+    }
+  }
+
   private readonly tick = (ticker: Ticker): void => {
+    if (this.paused) return // simulation, cooldowns and timer all stay frozen
     const dt = ticker.deltaMS / 1000
-    this.sim.advance(dt, this.input.read())
+    this.sim.advance(dt, this.readInput())
     this.renderer.render(this.sim.world, dt)
     this.sim.clearEvents()
     this.publish(dt)
@@ -76,25 +142,32 @@ export class GameController {
 
   private publish(dt: number): void {
     const world = this.sim.world
-    const ended = world.status === 'ended'
+    if (world.status === 'ended') {
+      if (this.endNotified || !world.endReason) return
+      this.endNotified = true // exactly one result per match
+      this.keyboard.detach()
+      this.touch.reset()
+      this.emitSnapshot()
+      this.hooks.onEnd?.({ score: world.score, duration: world.time, reason: world.endReason })
+      return
+    }
     this.sinceSnapshot += dt
-    if (!ended && this.sinceSnapshot < SNAPSHOT_INTERVAL) return
-    if (ended && this.endNotified) return
+    if (this.sinceSnapshot < SNAPSHOT_INTERVAL) return
     this.sinceSnapshot = 0
+    this.emitSnapshot()
+  }
 
+  private emitSnapshot(): void {
+    const world = this.sim.world
     this.hooks.onSnapshot?.({
       status: world.status,
       endReason: world.endReason,
+      paused: this.paused,
       elapsed: world.time,
       timeLeft: Math.max(0, world.config.sessionDuration - world.time),
       score: world.score,
       health: world.player.health,
       maxHealth: world.player.maxHealth,
     })
-
-    if (ended && world.endReason) {
-      this.endNotified = true // exactly one result per match
-      this.hooks.onEnd?.({ score: world.score, duration: world.time, reason: world.endReason })
-    }
   }
 }

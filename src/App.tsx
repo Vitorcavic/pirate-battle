@@ -1,19 +1,25 @@
-import { useGameAssets } from './game/useGameAssets'
-import { PixiCanvas } from './game/PixiCanvas'
-import { LoadingScreen, LoadError } from './ui/LoadingScreen'
+import { MainMenu } from './ui/MainMenu'
+import { MatchScreen } from './ui/MatchScreen'
+import { OptionsScreen } from './ui/OptionsScreen'
+import { ResultScreen } from './ui/ResultScreen'
 import { RotateNotice } from './ui/RotateNotice'
-import './index.css'
 import { AssetGallery } from './ui/AssetGallery'
+import { useUiStore } from './store/uiStore'
+import './index.css'
 
 export default function App() {
-  const { state, retry } = useGameAssets()
-  if (new URLSearchParams(location.search).has('gallery')) return <AssetGallery />
+  const screen = useUiStore((s) => s.screen)
+  const matchNonce = useUiStore((s) => s.matchNonce)
+
+  if (new URLSearchParams(window.location.search).has('gallery')) return <AssetGallery />
+
   return (
     <>
       <RotateNotice />
-      {state.status === 'loading' && <LoadingScreen progress={state.progress} />}
-      {state.status === 'error' && <LoadError onRetry={retry} />}
-      {state.status === 'ready' && <PixiCanvas textures={state.textures} />}
+      {screen === 'menu' && <MainMenu />}
+      {screen === 'options' && <OptionsScreen />}
+      {screen === 'match' && <MatchScreen key={matchNonce} />}
+      {screen === 'result' && <ResultScreen />}
     </>
   )
 }
