@@ -1,6 +1,6 @@
 import { useUiStore } from '../store/uiStore'
-
-const REASON_TEXT = { time: 'Time is up', death: 'Your ship was sunk' } as const
+import { formatDuration, REASON_LABEL } from './format'
+import { RecordStatus } from './SyncStatus'
 
 export function ResultScreen() {
   const match = useUiStore((s) => s.lastMatch)
@@ -25,11 +25,11 @@ export function ResultScreen() {
         <h1 id="result-title">Match result</h1>
         <dl className="result-list">
           <div><dt>Score</dt><dd data-testid="result-score">{match.score}</dd></div>
-          <div><dt>Time played</dt><dd data-testid="result-duration">{match.duration.toFixed(1)} s</dd></div>
-          <div><dt>Ended because</dt><dd data-testid="result-reason">{REASON_TEXT[match.reason]}</dd></div>
-          {/* Replaced by the real record status (pending / saved / failed + retry) in Block 7 */}
-          <div><dt>Match record</dt><dd data-testid="result-record">Not submitted yet</dd></div>
+          <div><dt>Time played</dt><dd data-testid="result-duration">{formatDuration(match.duration)}</dd></div>
+          <div><dt>Ended because</dt><dd data-testid="result-reason">{REASON_LABEL[match.reason]}</dd></div>
+          <div><dt>Match record</dt><dd><RecordStatus match={match} /></dd></div>
         </dl>
+        {/* The player can always start another match, even with a record still pending */}
         <div className="row">
           <button className="btn btn-primary" autoFocus onClick={() => { acknowledge(); startMatch() }}>
             Play Again

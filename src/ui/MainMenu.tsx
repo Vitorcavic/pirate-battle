@@ -1,6 +1,9 @@
 import type { KeyboardEvent } from 'react'
 import { useUiStore, type MenuTab } from '../store/uiStore'
 import { assetUrl } from './assetUrl'
+import { HistoryTab } from './HistoryTab'
+import { RankingTab } from './RankingTab'
+import { ScenarioPanel } from './ScenarioPanel'
 
 const CONTROLS: [string, string][] = [
   ['Move forward', 'W / ↑'],
@@ -69,11 +72,11 @@ export function MainMenu() {
             ))}
           </div>
           <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="tab-panel">
-            {/* Replaced by the real Ranking / Match History lists in Block 7 */}
-            <p className="hint">{tab === 'ranking' ? 'Ranking' : 'Match history'} arrives with the API step.</p>
+            {tab === 'ranking' ? <RankingTab /> : <HistoryTab />}
           </div>
         </section>
       </div>
+      <ScenarioPanel />
     </main>
   )
 }

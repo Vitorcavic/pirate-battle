@@ -5,7 +5,9 @@ import type { GameTextures } from './render/assets'
 import { GameRenderer } from './render/gameRenderer'
 import type { UserSettings } from './sim/config'
 import { Simulation } from './sim/simulation'
-import type { EndReason, InputState, MatchStatus } from './sim/types'
+import type { EndReason, InputState, MatchStatus, SimEvent, World } from './sim/types'
+import { installTestApi } from './testHooks'
+import { isTestMode, testManualClock, testSeed } from './testMode'
 
 declare global {
   interface Window {
@@ -57,6 +59,8 @@ export class GameController {
   private readonly hooks: GameHooks
   private readonly portrait = window.matchMedia(PORTRAIT_QUERY)
   private paused = false
+  private readonly manualClock = testManualClock()
+  private removeTestApi: (() => void) | null = null
   private sinceSnapshot = SNAPSHOT_INTERVAL
   private endNotified = false
 
@@ -64,7 +68,7 @@ export class GameController {
     this.app = app
     this.hooks = options.hooks ?? {}
     this.touch = options.touch ?? new TouchInput()
-    this.sim = new Simulation(settings, options.seed)
+    this.sim = new Simulation(settings, options.seed ?? testSeed())
     this.renderer = new GameRenderer(app.stage, textures, this.sim.world)
   }
 
@@ -76,6 +80,7 @@ export class GameController {
     this.portrait.addEventListener('change', this.onOrientation)
     this.app.ticker.add(this.tick)
     if (import.meta.env.DEV) window.__sim = this.sim
+    if (isTestMode()) this.removeTestApi = installTestApi(this)
   }
 
   destroy(): void {
@@ -87,6 +92,8 @@ export class GameController {
     this.keyboard.detach()
     this.touch.reset()
     this.renderer.destroy()
+    this.removeTestApi?.()
+    this.removeTestApi = null
     if (import.meta.env.DEV && window.__sim === this.sim) delete window.__sim
   }
 
@@ -106,6 +113,31 @@ export class GameController {
     this.sim.resetClock() // no catch-up for the paused period
     this.keyboard.attach()
     this.emitSnapshot()
+  }
+
+  getWorld(): World {
+    return this.sim.world
+  }
+
+  isPaused(): boolean {
+    return this.paused
+  }
+
+  /** Test instrumentation: runs the real fixed-step simulation, with the real keyboard/touch input. */
+  stepManual(seconds: number): SimEvent[] {
+    if (this.paused) return []
+    const world = this.sim.world
+    const fixedStep = world.config.fixedStep
+    const steps = Math.max(0, Math.round(seconds / fixedStep))
+    for (let i = 0; i < steps && world.status === 'playing'; i++) {
+      this.sim.step(fixedStep, this.readInput())
+    }
+    const events = [...world.events]
+    this.renderer.render(world, seconds)
+    this.sim.clearEvents()
+    this.sinceSnapshot = SNAPSHOT_INTERVAL // force a snapshot so the HUD matches
+    this.publish(seconds)
+    return events
   }
 
   private readonly onPauseKey = (e: KeyboardEvent): void => {
@@ -133,6 +165,11 @@ export class GameController {
 
   private readonly tick = (ticker: Ticker): void => {
     if (this.paused) return // simulation, cooldowns and timer all stay frozen
+    if (this.manualClock) {
+      // Test mode: time only moves through stepManual(). Frames just redraw the current state.
+      this.renderer.render(this.sim.world, 0)
+      return
+    }
     const dt = ticker.deltaMS / 1000
     this.sim.advance(dt, this.readInput())
     this.renderer.render(this.sim.world, dt)

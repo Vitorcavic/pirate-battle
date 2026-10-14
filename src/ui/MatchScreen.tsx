@@ -9,6 +9,10 @@ import { Hud, MatchAnnouncer } from './Hud'
 import { LoadError, LoadingScreen } from './LoadingScreen'
 import { PauseOverlay } from './PauseOverlay'
 import { TouchControls } from './TouchControls'
+import { getPlayer } from '../api/identity'
+import { buildMatchRecord } from '../api/records'
+import type { StoredMatch } from '../store/persistence'
+import { useSyncStore } from '../store/syncStore'
 
 export function MatchScreen() {
   const { state, retry } = useGameAssets()
@@ -28,7 +32,7 @@ export function MatchScreen() {
     () => ({
       onSnapshot: (snapshot) => useHudStore.setState(snapshot),
       onEnd: (result) => {
-        useUiStore.getState().recordMatch({
+        const stored: StoredMatch = {
           matchId,
           score: result.score,
           duration: result.duration,
@@ -36,7 +40,10 @@ export function MatchScreen() {
           endedAt: new Date().toISOString(),
           settings,
           acknowledged: false,
-        })
+        }
+        useUiStore.getState().recordMatch(stored)
+        // Queued and persisted at once: a refresh right now still keeps the pending record
+        useSyncStore.getState().enqueue(buildMatchRecord(stored, getPlayer()))
       },
     }),
     [matchId, settings],

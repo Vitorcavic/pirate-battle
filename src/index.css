@@ -373,6 +373,124 @@ h3 {
   display: none;
 }
 
+/* Lists */
+select {
+  font: inherit;
+  padding: 8px;
+  border-radius: 8px;
+  border: 2px solid #2a6489;
+  background: #06202f;
+  color: #fff;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.data-table th,
+.data-table td {
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: 1px solid #1c4a66;
+  white-space: nowrap;
+  font-weight: 400;
+}
+
+.data-table thead th {
+  color: #b9d4e6;
+  font-weight: 600;
+}
+
+.data-table tbody th {
+  font-weight: 600;
+}
+
+.data-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.data-table tr.me {
+  background: rgba(255, 210, 74, 0.15);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.error-box {
+  padding: 12px;
+  border: 2px solid #ff8a8a;
+  border-radius: 8px;
+  background: rgba(255, 138, 138, 0.08);
+}
+
+.link-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: #ffd24a;
+  text-decoration: underline;
+}
+
+.pending-box {
+  margin-bottom: 12px;
+  padding: 10px;
+  border: 2px dashed #ffd24a;
+  border-radius: 8px;
+}
+
+.pending-box h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+.pending-box ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.pending-box li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.record-status {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.scenario-panel {
+  width: min(900px, 100%);
+}
+
+.scenario-panel summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.field select {
+  width: 100%;
+}
+
 @media (orientation: portrait) and (max-width: 900px) {
   .rotate-notice {
     display: grid;
